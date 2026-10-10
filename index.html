@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#ffffff" />
+    <title>Pixby &mdash; Full of Flavour</title>
+    <link rel="icon" href="/logo.png" type="image/png" />
+    <link href="https://db.onlinewebfonts.com/c/fea031a5eb1f633a622138fe25624d42?family=Genty+Sans" rel="stylesheet" type="text/css" />
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body class="is-loading">
+    <div class="site-loader" role="status" aria-live="polite" aria-label="Loading Pixby">
+      <svg class="site-loader__can" viewBox="190 115 220 370" aria-hidden="true">
+        <defs>
+          <clipPath id="loader-can-mask">
+            <path d="M226 179 Q220 185 218 194 L218 426 Q218 437 230 440 Q300 454 372 440 Q384 437 384 426 L384 194 Q382 185 374 179 Z" />
+          </clipPath>
+        </defs>
+        <g clip-path="url(#loader-can-mask)">
+          <g class="site-loader__liquid-rise">
+            <g class="site-loader__wave-drift">
+              <path class="site-loader__liquid" d="M-120 180 C-90 164 -60 196 -30 180 S30 164 60 180 S120 196 150 180 S210 164 240 180 S300 196 330 180 S390 164 420 180 S480 196 510 180 S570 164 600 180 S660 196 690 180 L690 480 L-120 480 Z" />
+              <path class="site-loader__wave-highlight" d="M-120 180 C-90 164 -60 196 -30 180 S30 164 60 180 S120 196 150 180 S210 164 240 180 S300 196 330 180 S390 164 420 180 S480 196 510 180 S570 164 600 180 S660 196 690 180" />
+            </g>
+          </g>
+        </g>
+        <image href="/svg can.png" x="0" y="0" width="600" height="600" />
+      </svg>
+      <span class="visually-hidden">Loading Pixby apple juice</span>
+    </div>
+    <main class="page-shell">
+      <section class="flavour-stage" aria-label="Pixby apple flavour landing page">
+        <header class="site-header">
+          <a class="brand" href="#" aria-label="Pixby home">
+            <img class="brand__mark" src="/logo.png" alt="" />
+            <span class="brand__name">Pixby</span>
+          </a>
+
+          <nav class="main-nav" aria-label="Primary navigation">
+            <a href="#menu">Menu</a>
+            <a href="#about">About</a>
+            <a href="#contact">Contact</a>
+          </nav>
+
+          <button class="menu-button" type="button" aria-label="Open menu">
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+        </header>
+        <h1 class="hero-title" aria-label="Green Apple Juice">Green Apple Juice</h1>
+
+        <img class="apple-slice apple-slice--left" src="/apple.png" alt="" aria-hidden="true" />
+        <img class="apple-slice apple-slice--right" src="/apple.png" alt="" aria-hidden="true" />
+        <div class="product-scene" aria-label="Pixby apple juice cans">
+          <canvas class="product-scene__canvas"></canvas>
+        </div>
+
+        <p class="hero-copy hero-copy--left">
+          Taste and enjoy a cozy chill juice with low sugar and high energy to keep you going.
+        </p>
+        <p class="hero-copy hero-copy--right">
+          Our most selling juice.
+        </p>
+        <div class="flavour-controls" aria-label="Browse flavors">
+          <button class="flavour-control flavour-control--prev" type="button" aria-label="Previous flavor">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 5-7 7 7 7" /></svg>
+          </button>
+          <button class="flavour-control flavour-control--next" type="button" aria-label="Next flavor">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9.5 5 7 7-7 7" /></svg>
+          </button>
+        </div>
+
+        <a class="hero-cta" href="#shop">Get Now</a>
+        <div class="stage-texture" aria-hidden="true"></div>
+        <img class="splash-decal splash-decal--left" src="/splash.png" alt="" aria-hidden="true" />
+        <img class="splash-decal splash-decal--right" src="/splash.png" alt="" aria-hidden="true" />
+      </section>
+    </main>
+    <section class="story-section" id="about" data-flavor="green" aria-labelledby="story-copy">
+      <p class="story-copy" id="story-copy">
+        Crisp, refreshing, and naturally full of flavour &mdash; apple juice is that perfect balance of sweet and tangy in every sip. Simple, smooth, and made to taste as good as it looks.
+      </p>
+      <img class="story-splash story-splash--left" src="/splash.png" alt="" aria-hidden="true" />
+      <img class="story-splash story-splash--right" src="/splash.png" alt="" aria-hidden="true" />
+
+    </section>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "/src/vendor/three.module.js",
+          "three/addons/": "/src/vendor/"
+        }
+      }
+    </script>
+    <script src="/src/vendor/lottie.min.js"></script>
+    <script type="module" src="/src/main.js"></script>  </body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
