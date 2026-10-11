@@ -1,4 +1,4 @@
-import * as THREE from 'three'
+import * as THREE from './vendor/three.module.js'
 import { GLTFLoader } from './vendor/GLTFLoader.js'
 import { DRACOLoader } from './vendor/DRACOLoader.js'
 
@@ -152,7 +152,7 @@ if (container && canvas) {
 
   const loader = new GLTFLoader()
   const dracoLoader = new DRACOLoader()
-  dracoLoader.setDecoderPath('/src/vendor/draco/')
+  dracoLoader.setDecoderPath('/draco/')
   loader.setDRACOLoader(dracoLoader)
 
 
