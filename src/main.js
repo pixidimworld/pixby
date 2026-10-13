@@ -11,7 +11,10 @@ const appleSlices = document.querySelectorAll('.apple-slice')
 const previousButton = document.querySelector('.flavour-control--prev')
 const nextButton = document.querySelector('.flavour-control--next')
 const storySection = document.querySelector('.story-section')
+const nutritionSection = document.querySelector('.nutrition-section')
+const nutrientCallouts = [...document.querySelectorAll('.nutrition-callout')]
 const pageLoader = document.querySelector('.site-loader')
+const siteScroll = document.querySelector('.site-scroll')
 let resolveLoaderFinished
 const loaderFinished = new Promise((resolve) => {
   resolveLoaderFinished = resolve
@@ -20,6 +23,7 @@ const loaderFinished = new Promise((resolve) => {
 if (pageLoader) {
   if ('scrollRestoration' in history) history.scrollRestoration = 'manual'
   window.scrollTo(0, 0)
+  siteScroll?.scrollTo(0, 0)
   document.documentElement.dataset.loaderState = 'filling'
 
   const minimumFillTime = new Promise((resolve) => window.setTimeout(resolve, 2800))
@@ -160,6 +164,31 @@ if (container && canvas) {
 
   let interactionReady = false
   let activeCan = null
+  const touchFirstQuery = window.matchMedia('(hover: none), (pointer: coarse)')
+  const isTouchFirstInteraction = () => touchFirstQuery.matches
+  let orientationBaseBeta = null
+  let orientationBaseGamma = null
+  let orientationPitchTarget = 0
+  let orientationYawTarget = 0
+
+  window.addEventListener('deviceorientation', (event) => {
+    if (!isTouchFirstInteraction() || event.beta == null || event.gamma == null) return
+    if (orientationBaseBeta == null || orientationBaseGamma == null) {
+      orientationBaseBeta = event.beta
+      orientationBaseGamma = event.gamma
+      return
+    }
+
+    orientationPitchTarget = THREE.MathUtils.clamp((event.beta - orientationBaseBeta) / 35, -1, 1) * 0.055
+    orientationYawTarget = THREE.MathUtils.clamp((event.gamma - orientationBaseGamma) / 35, -1, 1) * 0.09
+  }, { passive: true })
+
+  window.addEventListener('orientationchange', () => {
+    orientationBaseBeta = null
+    orientationBaseGamma = null
+    orientationPitchTarget = 0
+    orientationYawTarget = 0
+  }, { passive: true })
 
   const enableActiveCanDrag = () => {
     const raycaster = new THREE.Raycaster()
@@ -187,6 +216,7 @@ if (container && canvas) {
     }
 
     canvas.addEventListener('pointerdown', (event) => {
+      if (event.pointerType === 'touch' || isTouchFirstInteraction()) return
       if (!interactionReady || !event.isPrimary || !hitsActiveCan(event)) return
       dragging = true
       startX = event.clientX
@@ -199,6 +229,7 @@ if (container && canvas) {
     })
 
     canvas.addEventListener('pointermove', (event) => {
+      if (event.pointerType === 'touch' || isTouchFirstInteraction()) return
       if (dragging && activeCan) {
         const yawTurn = ((event.clientX - startX) / canvas.clientWidth) * Math.PI * 2.4
         const pitchTurn = ((event.clientY - startY) / canvas.clientHeight) * Math.PI * 2.4
@@ -223,12 +254,21 @@ if (container && canvas) {
     })
   }
 
-  const resize = () => {
-    const width = container.clientWidth
-    const height = container.clientHeight
+  let resizeFrame = 0
+  let renderedWidth = 0
+  let renderedHeight = 0
+
+  const resize = (force = false) => {
+    const width = Math.round(container.clientWidth)
+    const height = Math.round(container.clientHeight)
+    if (width < 1 || height < 1) return
+    if (!force && Math.abs(width - renderedWidth) < 2 && Math.abs(height - renderedHeight) < 2) return
+
     const viewHeight = 10
     const viewWidth = viewHeight * (width / height)
 
+    renderedWidth = width
+    renderedHeight = height
     camera.left = -viewWidth / 2
     camera.right = viewWidth / 2
     camera.top = viewHeight / 2
@@ -236,6 +276,14 @@ if (container && canvas) {
     camera.updateProjectionMatrix()
     renderer.setSize(width, height, false)
     render()
+  }
+
+  const requestResize = () => {
+    if (resizeFrame) return
+    resizeFrame = requestAnimationFrame(() => {
+      resizeFrame = 0
+      resize()
+    })
   }
 
 
@@ -279,10 +327,15 @@ if (container && canvas) {
       const materials = Array.isArray(child.material) ? child.material : [child.material]
       materials.forEach((material) => {
         const fullOpacity = material.userData.fullOpacity ?? 1
-        material.opacity = fullOpacity * opacity
-        material.transparent = opacity < 0.999
-        material.depthWrite = opacity >= 0.999
-        material.needsUpdate = true
+        const nextOpacity = fullOpacity * opacity
+        const nextTransparent = opacity < 0.999
+        const nextDepthWrite = opacity >= 0.999
+        const renderStateChanged = material.transparent !== nextTransparent || material.depthWrite !== nextDepthWrite
+
+        material.opacity = nextOpacity
+        material.transparent = nextTransparent
+        material.depthWrite = nextDepthWrite
+        if (renderStateChanged) material.needsUpdate = true
       })
     })
   }
@@ -310,6 +363,8 @@ if (container && canvas) {
     render()
 
     const tick = (now, startTime) => {
+      if (isTouchFirstInteraction() && container.classList.contains('is-story-travelling')) return
+
       const raw = Math.max(0, Math.min(1, (now - startTime) / duration))
       container.dataset.animationProgress = raw.toFixed(2)
       const eased = 1 - Math.pow(1 - raw, 3)
@@ -348,7 +403,7 @@ if (container && canvas) {
 
       const isNarrow = container.clientWidth <= 700
       const centerTarget = isNarrow
-        ? { x: -0.35, y: -1.05, z: 0 }
+        ? { x: 0, y: -1.05, z: 0 }
         : { x: -0.55, y: -0.25, z: 0 }
       const rightTarget = isNarrow
         ? { x: 2.05, y: -0.35, z: -0.25 }
@@ -375,6 +430,45 @@ if (container && canvas) {
 
       let activeIndex = 0
       let switchingFlavor = false
+      const nutrientRevealStarts = isNarrow
+        ? [0.08, 0.22, 0.36, 0.50, 0.64, 0.78, 0.90]
+        : [0.20, 0.30, 0.40, 0.50, 0.62, 0.72, 0.82]
+      const nutrientRevealDuration = isNarrow ? 0.065 : 0.07
+      const nutrientRevealWindows = nutrientRevealStarts.map((start) => [
+        start,
+        Math.min(1, start + nutrientRevealDuration),
+      ])
+
+      const smoothRange = (value, start, end) => {
+        const progress = THREE.MathUtils.clamp((value - start) / Math.max(0.0001, end - start), 0, 1)
+        return progress * progress * (3 - 2 * progress)
+      }
+
+      const updateNutritionReveal = (progress) => {
+        if (!nutritionSection) return
+
+        nutritionSection.dataset.progress = progress.toFixed(3)
+        nutritionSection.style.setProperty('--nutrition-entry', smoothRange(progress, 0, 0.1).toFixed(3))
+        const visibleCount = isNarrow ? 1 : 3
+
+        nutrientCallouts.forEach((callout, index) => {
+          const [start, end] = nutrientRevealWindows[index]
+          const localProgress = THREE.MathUtils.clamp((progress - start) / (end - start), 0, 1)
+          const pointProgress = smoothRange(localProgress, 0, 0.16)
+          const lineProgress = smoothRange(localProgress, 0.16, 0.62)
+          const cardProgress = smoothRange(localProgress, 0.62, 1)
+          const exitStart = nutrientRevealStarts[index + visibleCount]
+          const persistence = exitStart == null
+            ? 1
+            : 1 - smoothRange(progress, exitStart, Math.min(1, exitStart + (isNarrow ? 0.025 : 0.035)))
+
+          callout.style.opacity = persistence.toFixed(3)
+          callout.style.setProperty('--point-progress', pointProgress.toFixed(3))
+          callout.style.setProperty('--line-progress', lineProgress.toFixed(3))
+          callout.style.setProperty('--card-progress', cardProgress.toFixed(3))
+          callout.style.setProperty('--card-opacity', cardProgress.toFixed(3))
+        })
+      }
 
       const targetForSlot = (flavor, slot) => {
         if (slot === 0) {
@@ -409,6 +503,67 @@ if (container && canvas) {
         }
       }
 
+      let mobileMotionFrame = 0
+      let mobilePitch = 0
+      let mobileYaw = 0
+      let mobileMotionTime = performance.now()
+
+      const updateMobileMotion = (now) => {
+        mobileMotionFrame = 0
+        if (!isTouchFirstInteraction()) return
+
+        const delta = Math.min(0.05, Math.max(0, (now - mobileMotionTime) / 1000))
+        mobileMotionTime = now
+        const storyProgress = Number.parseFloat(container.dataset.storyProgress || '0')
+
+        if (activeCan && interactionReady && !switchingFlavor && storyProgress <= 0.001) {
+          const base = targetForSlot(flavors[activeIndex], 0)
+          const seconds = now / 1000
+          const pitchTarget = orientationPitchTarget + Math.sin(seconds * 1.1) * 0.018
+          const yawTarget = orientationYawTarget + Math.sin(seconds * 0.72) * 0.026
+          const damping = 1 - Math.exp(-6 * delta)
+
+          mobilePitch = THREE.MathUtils.lerp(mobilePitch, pitchTarget, damping)
+          mobileYaw = THREE.MathUtils.lerp(mobileYaw, yawTarget, damping)
+          activeCan.rotation.x = base.pitch + mobilePitch
+          activeCan.rotation.y = base.yaw + mobileYaw
+          activeCan.rotation.z = base.roll + mobileYaw * 0.12
+          container.dataset.mobilePitch = mobilePitch.toFixed(3)
+          container.dataset.mobileYaw = mobileYaw.toFixed(3)
+          render()
+        }
+
+        mobileMotionFrame = requestAnimationFrame(updateMobileMotion)
+      }
+
+      const updateInteractionMode = () => {
+        container.dataset.interactionMode = isTouchFirstInteraction() ? 'mobile-passive' : 'desktop-drag'
+        if (isTouchFirstInteraction()) {
+          if (!mobileMotionFrame) {
+            mobileMotionTime = performance.now()
+            mobileMotionFrame = requestAnimationFrame(updateMobileMotion)
+          }
+          return
+        }
+
+        if (mobileMotionFrame) cancelAnimationFrame(mobileMotionFrame)
+        mobileMotionFrame = 0
+        mobilePitch = 0
+        mobileYaw = 0
+        if (activeCan && interactionReady) {
+          const base = targetForSlot(flavors[activeIndex], 0)
+          activeCan.rotation.set(base.pitch, base.yaw, base.roll)
+          render()
+        }
+      }
+
+      if ('addEventListener' in touchFirstQuery) {
+        touchFirstQuery.addEventListener('change', updateInteractionMode)
+      } else {
+        touchFirstQuery.addListener(updateInteractionMode)
+      }
+      updateInteractionMode()
+
       const applyLayout = (targetActiveIndex) => {
         flavors.forEach((flavor, index) => {
           const slot = (index - targetActiveIndex + flavors.length) % flavors.length
@@ -442,25 +597,49 @@ if (container && canvas) {
         if (!storySection || switchingFlavor) return
 
         const rect = storySection.getBoundingClientRect()
-        const progress = THREE.MathUtils.clamp((window.innerHeight - rect.top) / window.innerHeight, 0, 1)
+        const viewportHeight = isNarrow ? Math.max(1, storySection.clientHeight) : window.innerHeight
+        const progress = THREE.MathUtils.clamp((viewportHeight - rect.top) / viewportHeight, 0, 1)
         const eased = progress * progress * (3 - 2 * progress)
+        const nutritionRect = nutritionSection?.getBoundingClientRect()
+        const nutritionViewportHeight = nutritionSection?.querySelector('.nutrition-sticky')?.clientHeight
+          || window.innerHeight
+        const nutritionTravel = nutritionSection
+          ? Math.max(1, nutritionSection.offsetHeight - nutritionViewportHeight)
+          : 1
+        const nutritionActive = Boolean(nutritionRect && nutritionRect.top <= 0 && nutritionRect.bottom > 0)
+        const nutritionProgress = nutritionActive
+          ? THREE.MathUtils.clamp(-nutritionRect.top / nutritionTravel, 0, 1)
+          : 0
+        const handoffProgress = nutritionRect
+          ? THREE.MathUtils.clamp((viewportHeight - nutritionRect.top) / viewportHeight, 0, 1)
+          : 0
+        const handoffEased = 1 - Math.pow(1 - handoffProgress, 2)
+        const standProgress = THREE.MathUtils.clamp(handoffProgress / 0.42, 0, 1)
         const activeFlavor = flavors[activeIndex]
         const heroTarget = targetForSlot(activeFlavor, 0)
         const storyY = isNarrow ? -1.05 : -1
-        const storyScale = activeFlavor.heroScale * (isNarrow ? 1.02 : 1.1)
+        const nutritionY = isNarrow ? storyY : storyY - 0.35
+        const storyScale = activeFlavor.heroScale * 1.1
+        const sectionScale = isNarrow ? heroTarget.scale : storyScale
+        const handoffRotation = Math.PI * 2 * 0.25
+
+        updateNutritionReveal(nutritionProgress)
 
         if (progress <= 0.001) {
           if (storyTravelling) {
             storyTravelling = false
             container.classList.remove('is-story-travelling')
             stage.appendChild(container)
-            resize()
+            resize(true)
           }
           applyLayout(activeIndex)
           activeCan = activeFlavor.model
           interactionReady = true
           canvas.classList.add('is-ready')
           container.dataset.storyProgress = '0.00'
+          container.dataset.handoffProgress = '0.000'
+          container.dataset.nutritionProgress = '0.00'
+          container.dataset.sceneSection = 'hero'
           render()
           return
         }
@@ -469,12 +648,12 @@ if (container && canvas) {
           storyTravelling = true
           container.classList.add('is-story-travelling')
           document.body.appendChild(container)
-          resize()
+          resize(true)
         }
 
         interactionReady = false
         canvas.classList.remove('is-ready', 'can-hover')
-        const landingPageShift = progress * window.innerHeight * (10 / container.clientHeight)
+        const landingPageShift = progress * viewportHeight * (10 / container.clientHeight)
         flavors.forEach((flavor, index) => {
           const slot = (index - activeIndex + flavors.length) % flavors.length
           const target = targetForSlot(flavor, slot)
@@ -488,18 +667,55 @@ if (container && canvas) {
           setModelOpacity(flavor.model, target.opacity)
         })
 
-        activeFlavor.model.position.set(
-          THREE.MathUtils.lerp(heroTarget.x, 0, eased),
-          THREE.MathUtils.lerp(heroTarget.y, storyY, eased),
-          0,
-        )
-        activeFlavor.model.rotation.set(
-          heroTarget.pitch + eased * (Math.PI * 2 + 0.16),
-          THREE.MathUtils.lerp(heroTarget.yaw, restingYaw, eased) + Math.sin(progress * Math.PI) * 0.32,
-          THREE.MathUtils.lerp(heroTarget.roll, 0.16, eased),
-        )
-        activeFlavor.model.scale.setScalar(THREE.MathUtils.lerp(heroTarget.scale, storyScale, eased))
+        if (nutritionActive) {
+          const rotationProgress = THREE.MathUtils.clamp(nutritionProgress, 0, 1)
+          const slowedRotation = 1 - Math.pow(1 - rotationProgress, 1.08)
+
+          activeFlavor.model.position.set(
+            0,
+            nutritionY,
+            0,
+          )
+          activeFlavor.model.rotation.set(
+            Math.PI * 2 + heroTarget.pitch,
+            restingYaw + handoffRotation + slowedRotation * (Math.PI * 2 - handoffRotation),
+            0,
+          )
+          activeFlavor.model.scale.setScalar(sectionScale)
+          container.dataset.sceneSection = 'nutrition'
+        } else if (handoffProgress > 0) {
+          activeFlavor.model.position.set(
+            0,
+            THREE.MathUtils.lerp(storyY, nutritionY, handoffEased),
+            0,
+          )
+          activeFlavor.model.rotation.set(
+            Math.PI * 2 + THREE.MathUtils.lerp(heroTarget.pitch + 0.16, heroTarget.pitch, standProgress),
+            restingYaw + handoffProgress * handoffRotation,
+            THREE.MathUtils.lerp(0.16, 0, standProgress),
+          )
+          activeFlavor.model.scale.setScalar(sectionScale)
+          container.dataset.sceneSection = 'handoff'
+        } else {
+          activeFlavor.model.position.set(
+            THREE.MathUtils.lerp(heroTarget.x, 0, eased),
+            THREE.MathUtils.lerp(heroTarget.y, storyY, eased),
+            0,
+          )
+          activeFlavor.model.rotation.set(
+            heroTarget.pitch + eased * (Math.PI * 2 + 0.16),
+            THREE.MathUtils.lerp(heroTarget.yaw, restingYaw, eased) + Math.sin(progress * Math.PI) * 0.32,
+            THREE.MathUtils.lerp(heroTarget.roll, 0.16, eased),
+          )
+          const transitionScale = isNarrow
+            ? heroTarget.scale
+            : THREE.MathUtils.lerp(heroTarget.scale, storyScale, eased)
+          activeFlavor.model.scale.setScalar(transitionScale)
+          container.dataset.sceneSection = 'story'
+        }
         container.dataset.storyProgress = progress.toFixed(2)
+        container.dataset.handoffProgress = handoffProgress.toFixed(3)
+        container.dataset.nutritionProgress = nutritionProgress.toFixed(3)
         render()
       }
 
@@ -511,6 +727,7 @@ if (container && canvas) {
         })
       }
       window.addEventListener('scroll', requestStoryRender, { passive: true })
+      siteScroll?.addEventListener('scroll', requestStoryRender, { passive: true })
 
       const switchFlavor = (direction) => {
         if (!interactionReady || switchingFlavor) return
@@ -524,6 +741,7 @@ if (container && canvas) {
 
         if (stage) stage.dataset.flavor = flavors[targetIndex].name
         if (storySection) storySection.dataset.flavor = flavors[targetIndex].name
+        if (nutritionSection) nutritionSection.dataset.flavor = flavors[targetIndex].name
         if (heroRightCopy) heroRightCopy.textContent = flavors[targetIndex].rightCopy
 
         renderFlavorHeading(
@@ -608,6 +826,7 @@ if (container && canvas) {
       applyLayout(activeIndex)
       if (stage) stage.dataset.flavor = flavors[activeIndex].name
       if (storySection) storySection.dataset.flavor = flavors[activeIndex].name
+      if (nutritionSection) nutritionSection.dataset.flavor = flavors[activeIndex].name
       if (heroRightCopy) heroRightCopy.textContent = flavors[activeIndex].rightCopy
       container.dataset.activeFlavor = flavors[activeIndex].name
       container.dataset.modelState = 'ready'
@@ -630,10 +849,10 @@ if (container && canvas) {
     }
   }
   enableActiveCanDrag()
-  const observer = new ResizeObserver(resize)
+  const observer = new ResizeObserver(requestResize)
   observer.observe(container)
-  resize()
+  window.visualViewport?.addEventListener('resize', requestResize, { passive: true })
+  window.addEventListener('orientationchange', requestResize, { passive: true })
+  resize(true)
   loadModels()
 }
-
-
