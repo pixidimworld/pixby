@@ -1,3 +1,11 @@
+@font-face {
+  font-family: "Genty Sans";
+  src: url("/genty-sans.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   font-family: Arial, Helvetica, sans-serif;
   color: #17220d;
